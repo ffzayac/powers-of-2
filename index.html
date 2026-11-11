@@ -236,12 +236,21 @@
     return n;
   }
 
+  function applyCard(n) {
+    quizExpr.innerHTML = '2<sup>' + n + '</sup>';
+    quizValue.textContent = Math.pow(2, n);
+  }
+
   function showQuizCard(n) {
     quizCurrent = n;
     quizStage = 'front';
-    quizCard.classList.remove('flipped');
-    quizExpr.innerHTML = '2<sup>' + n + '</sup>';
-    quizValue.textContent = Math.pow(2, n);
+    if (quizCard.classList.contains('flipped')) {
+      // прячем старый ответ поворотом и меняем содержимое, когда оборот уже «на ребре»
+      quizCard.classList.remove('flipped');
+      setTimeout(function() { applyCard(n); }, 250);
+    } else {
+      applyCard(n);
+    }
     quizMeta.textContent = 'Показано карточек: ' + quizShown;
   }
 
