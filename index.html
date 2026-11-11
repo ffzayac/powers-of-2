@@ -26,7 +26,23 @@
     padding: 32px 16px;
   }
   h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 6px; }
-  .hint { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+  .hint { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 28px; }
+  .tab {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--card-back);
+    color: var(--text);
+    border-color: var(--accent);
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -84,22 +100,83 @@
     transition: background 0.2s;
   }
   button:hover { background: var(--card-back); }
+
+  /* Режим квиза */
+  #quizView {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  #quizView.active { display: flex; }
+  #gridView.hidden { display: none; }
+  .quiz-card {
+    width: min(320px, 80vw);
+    aspect-ratio: 3 / 4;
+  }
+  .quiz-card .expr { font-size: 3.4rem; }
+  .quiz-card .expr sup { font-size: 1.9rem; }
+  .quiz-card .value { font-size: 3.8rem; }
+  .quiz-card .label { font-size: 0.85rem; }
+  .quiz-meta {
+    margin-top: 20px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .quiz-controls { margin-top: 16px; display: flex; gap: 12px; }
 </style>
 </head>
 <body>
   <h1>Степени двойки</h1>
-  <p class="hint">Нажми на карточку, чтобы перевернуть</p>
-  <div class="grid" id="grid"></div>
-  <div class="controls">
-    <button id="flipAll">Перевернуть все</button>
-    <button id="resetAll">Сбросить</button>
+  <div class="tabs">
+    <button class="tab active" id="tabGrid">Все карточки</button>
+    <button class="tab" id="tabQuiz">Квиз</button>
   </div>
+  <p class="hint" id="hint">Нажми на карточку, чтобы перевернуть</p>
+
+  <div id="gridView">
+    <div class="grid" id="grid"></div>
+    <div class="controls">
+      <button id="flipAll">Перевернуть все</button>
+      <button id="resetAll">Сбросить</button>
+    </div>
+  </div>
+
+  <div id="quizView">
+    <div class="card quiz-card" id="quizCard">
+      <div class="card-inner">
+        <div class="face face-front">
+          <span class="label">степень</span>
+          <span class="expr" id="quizExpr">2<sup>1</sup></span>
+        </div>
+        <div class="face face-back">
+          <span class="label">значение</span>
+          <span class="value" id="quizValue">2</span>
+        </div>
+      </div>
+    </div>
+    <div class="quiz-meta" id="quizMeta">Показано карточек: 0</div>
+    <div class="quiz-controls">
+      <button id="quizExit">Выход</button>
+    </div>
+  </div>
+
 <script>
 (function() {
   'use strict';
+  var gridView = document.getElementById('gridView');
+  var quizView = document.getElementById('quizView');
+  var tabGrid = document.getElementById('tabGrid');
+  var tabQuiz = document.getElementById('tabQuiz');
+  var hint = document.getElementById('hint');
   var grid = document.getElementById('grid');
-  var cards = [];
+  var quizCard = document.getElementById('quizCard');
+  var quizExpr = document.getElementById('quizExpr');
+  var quizValue = document.getElementById('quizValue');
+  var quizMeta = document.getElementById('quizMeta');
 
+  /* ---- Режим «Все карточки» ---- */
+  var cards = [];
   for (var n = 1; n <= 10; n++) {
     var card = document.createElement('div');
     card.className = 'card';
@@ -127,6 +204,61 @@
   document.getElementById('resetAll').addEventListener('click', function() {
     cards.forEach(function(c) { c.classList.remove('flipped'); });
   });
+
+  /* ---- Режим «Квиз» ---- */
+  var quizStage = 'front';   // 'front' — ждём переворот, 'back' — ждём следующую карточку
+  var quizCurrent = 0;
+  var quizShown = 0;
+
+  function randomN(notEqual) {
+    var n;
+    do {
+      n = 1 + Math.floor(Math.random() * 10);
+    } while (n === notEqual);
+    return n;
+  }
+
+  function showQuizCard(n) {
+    quizCurrent = n;
+    quizStage = 'front';
+    quizCard.classList.remove('flipped');
+    quizExpr.innerHTML = '2<sup>' + n + '</sup>';
+    quizValue.textContent = Math.pow(2, n);
+    quizMeta.textContent = 'Показано карточек: ' + quizShown;
+  }
+
+  quizCard.addEventListener('click', function() {
+    if (quizStage === 'front') {
+      quizStage = 'back';
+      quizCard.classList.add('flipped');
+    } else {
+      quizShown++;
+      showQuizCard(randomN(quizCurrent));
+    }
+  });
+
+  document.getElementById('quizExit').addEventListener('click', function() {
+    setMode('grid');
+  });
+
+  /* ---- Переключение режимов ---- */
+  function setMode(mode) {
+    var isQuiz = mode === 'quiz';
+    tabGrid.classList.toggle('active', !isQuiz);
+    tabQuiz.classList.toggle('active', isQuiz);
+    gridView.classList.toggle('hidden', isQuiz);
+    quizView.classList.toggle('active', isQuiz);
+    if (isQuiz) {
+      hint.textContent = 'Нажми на карточку, чтобы увидеть ответ, ещё раз — следующая';
+      quizShown = 0;
+      showQuizCard(randomN(0));
+    } else {
+      hint.textContent = 'Нажми на карточку, чтобы перевернуть';
+    }
+  }
+
+  tabGrid.addEventListener('click', function() { setMode('grid'); });
+  tabQuiz.addEventListener('click', function() { setMode('quiz'); });
 })();
 </script>
 </body>
