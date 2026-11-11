@@ -287,6 +287,7 @@
 
   /* ---- Режим «Все карточки» ---- */
   var curBase = 2;
+  var gridDirty = false;   // сетка устарела, если основание меняли в квизе
   var baseBtns = Array.prototype.slice.call(document.querySelectorAll('.base-btn'));
   var cards = [];
 
@@ -329,6 +330,7 @@
       quizWrong = 0;
       baseBtns.forEach(function(x) { x.classList.toggle('active', x === b); });
       if (quizView.classList.contains('active')) {
+        gridDirty = true;
         nextCard();
       } else {
         buildGrid();
@@ -484,6 +486,10 @@
       showQuizCard(randomN(0));
     } else {
       hint.textContent = 'Нажми на карточку, чтобы перевернуть';
+      if (gridDirty) {
+        buildGrid();
+        gridDirty = false;
+      }
     }
   }
 
