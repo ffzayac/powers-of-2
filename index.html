@@ -126,7 +126,7 @@
   #gridView { width: 100%; max-width: 860px; }
   #gridView.hidden { display: none; }
   .quiz-card {
-    width: min(320px, 80vw, max(200px, calc((100vh - 330px) * 0.75)));
+    width: min(320px, 80vw, max(150px, calc((100vh - 560px) * 0.75)));
     aspect-ratio: 3 / 4;
   }
   .quiz-card .expr { font-size: clamp(2.6rem, 11vw, 3.4rem); }
@@ -139,25 +139,69 @@
     font-size: 0.9rem;
   }
   .quiz-controls { margin-top: 16px; display: flex; gap: 12px; }
-  .quiz-input-row { margin-top: 20px; display: flex; gap: 8px; }
-  #quizInput {
+  .quiz-display {
+    margin-top: 20px;
+    width: min(320px, 100%);
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--card-front);
     border: 1px solid var(--border);
     border-radius: 8px;
-    color: var(--text);
-    font-size: 1.1rem;
-    font-family: inherit;
-    padding: 10px 14px;
-    width: 160px;
-    min-height: 48px;
-    text-align: center;
-    outline: none;
-    touch-action: manipulation;
-    transition: border-color 0.2s;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
   }
-  #quizInput:focus { border-color: var(--accent); }
-  #quizInput:disabled { opacity: 0.5; }
+  .quiz-display.empty { color: var(--muted); font-size: 0.95rem; font-weight: 400; letter-spacing: 0; }
+  .keypad {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: min(320px, 100%);
+  }
+  .key {
+    background: var(--card-front);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 48px;
+    font-size: 1.15rem;
+    font-family: inherit;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (hover: hover) {
+    .key:hover { background: var(--card-back); }
+  }
+  .key.accent { background: var(--card-back); border-color: var(--accent); }
+  .keypad.locked .key { opacity: 0.5; pointer-events: none; }
+  @media (max-height: 750px) {
+    .tabs { margin-bottom: 12px; }
+    .quiz-display { margin-top: 12px; min-height: 44px; }
+    .keypad { margin-top: 12px; gap: 6px; }
+    .key { min-height: 44px; }
+    .quiz-meta { margin-top: 10px; }
+    .quiz-controls { margin-top: 10px; }
+    .quiz-controls button { min-height: 40px; padding: 8px 14px; }
+  }
+  @media (max-height: 600px) {
+    body { padding-top: 14px; padding-bottom: 12px; }
+    .tabs { margin-bottom: 8px; }
+    .quiz-card { width: min(320px, 80vw, max(120px, calc((100vh - 480px) * 0.75))); }
+    .quiz-display { margin-top: 10px; min-height: 40px; font-size: 1.2rem; }
+    .keypad { margin-top: 10px; gap: 4px; }
+    .key { min-height: 40px; font-size: 1.05rem; }
+    .quiz-meta { margin-top: 8px; font-size: 0.8rem; }
+    .quiz-controls { margin-top: 8px; }
+    .quiz-controls button { min-height: 36px; padding: 6px 12px; font-size: 0.85rem; }
+  }
   .face { transition: border-color 0.3s, box-shadow 0.3s; }
+  body.quiz-mode .hint { display: none; }
   .quiz-card.correct .face {
     border-color: #4caf50;
     box-shadow: 0 0 18px rgba(76, 175, 80, 0.35);
@@ -197,10 +241,8 @@
         </div>
       </div>
     </div>
-    <div class="quiz-input-row">
-      <input id="quizInput" type="text" inputmode="numeric" autocomplete="off" placeholder="Введи значение">
-      <button id="quizAnswer">Ответить</button>
-    </div>
+    <div class="quiz-display empty" id="quizDisplay">Введи значение</div>
+    <div class="keypad" id="keypad"></div>
     <div class="quiz-meta" id="quizMeta">Верно: 0 · Неверно: 0 · Точность: —</div>
     <div class="quiz-controls">
       <button id="quizResetStats">Сброс статистики</button>
@@ -261,7 +303,9 @@
   var quizCorrect = 0;
   var quizWrong = 0;
   var quizTimer = null;
-  var quizInput = document.getElementById('quizInput');
+  var quizDisplay = document.getElementById('quizDisplay');
+  var keypad = document.getElementById('keypad');
+  var quizTyped = '';
 
   function randomN(notEqual) {
     var n;
@@ -282,6 +326,28 @@
     quizValue.textContent = Math.pow(2, n);
   }
 
+  function renderDisplay() {
+    if (quizTyped) {
+      quizDisplay.textContent = quizTyped;
+      quizDisplay.classList.remove('empty');
+    } else {
+      quizDisplay.textContent = 'Введи значение';
+      quizDisplay.classList.add('empty');
+    }
+  }
+
+  function pressDigit(d) {
+    if (quizStage !== 'front' || quizTyped.length >= 4) return;
+    quizTyped += d;
+    renderDisplay();
+  }
+
+  function pressBackspace() {
+    if (quizStage !== 'front') return;
+    quizTyped = quizTyped.slice(0, -1);
+    renderDisplay();
+  }
+
   function showQuizCard(n) {
     quizCurrent = n;
     quizStage = 'front';
@@ -293,21 +359,19 @@
     } else {
       applyCard(n);
     }
-    quizInput.disabled = false;
-    quizInput.value = '';
-    quizInput.focus();
+    quizTyped = '';
+    renderDisplay();
+    keypad.classList.remove('locked');
     updateMeta();
   }
 
   function answer() {
-    if (quizStage !== 'front') return;
-    var raw = quizInput.value.trim();
-    if (!/^\d+$/.test(raw)) return;
-    var ok = parseInt(raw, 10) === Math.pow(2, quizCurrent);
+    if (quizStage !== 'front' || !/^\d+$/.test(quizTyped)) return;
+    var ok = parseInt(quizTyped, 10) === Math.pow(2, quizCurrent);
     if (ok) { quizCorrect++; } else { quizWrong++; }
     if (navigator.vibrate) navigator.vibrate(ok ? 10 : [10, 50, 10]);
     quizStage = 'back';
-    quizInput.disabled = true;
+    keypad.classList.add('locked');
     quizCard.classList.add(ok ? 'correct' : 'wrong');
     quizCard.classList.add('flipped');
     updateMeta();
@@ -319,15 +383,33 @@
     showQuizCard(randomN(quizCurrent));
   }
 
+  // Собственная клавиатура: никакая системная клавиатура не открывается
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'submit'].forEach(function(k) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'key' + (k === 'submit' ? ' accent' : '');
+    b.textContent = k === 'back' ? '⌫' : (k === 'submit' ? 'Ответить' : k);
+    if (k === 'back') b.setAttribute('aria-label', 'Стереть');
+    b.addEventListener('click', function() {
+      if (k === 'back') { pressBackspace(); }
+      else if (k === 'submit') { answer(); }
+      else {
+        pressDigit(k);
+        if (navigator.vibrate) navigator.vibrate(5);
+      }
+    });
+    keypad.appendChild(b);
+  });
+
   quizCard.addEventListener('click', function() {
     if (quizStage === 'back') nextCard();
   });
-  document.getElementById('quizAnswer').addEventListener('click', answer);
-  quizInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') answer();
-  });
-  quizInput.addEventListener('input', function() {
-    quizInput.value = quizInput.value.replace(/\D/g, '').slice(0, 4);
+  // Физическая клавиатура на десктопе
+  document.addEventListener('keydown', function(e) {
+    if (!quizView.classList.contains('active')) return;
+    if (e.key >= '0' && e.key <= '9') pressDigit(e.key);
+    else if (e.key === 'Backspace') pressBackspace();
+    else if (e.key === 'Enter') answer();
   });
   document.getElementById('quizResetStats').addEventListener('click', function() {
     quizCorrect = 0;
@@ -346,6 +428,7 @@
     tabQuiz.classList.toggle('active', isQuiz);
     gridView.classList.toggle('hidden', isQuiz);
     quizView.classList.toggle('active', isQuiz);
+    document.body.classList.toggle('quiz-mode', isQuiz);
     if (isQuiz) {
       hint.textContent = 'Введи значение степени и нажми «Ответить»';
       quizCorrect = 0;
