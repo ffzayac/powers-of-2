@@ -51,6 +51,24 @@
   .base-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 28px; }
   .base-label { color: var(--muted); font-size: 0.9rem; }
   .base-btn { min-height: 48px; min-width: 48px; padding: 8px 0; }
+  .max-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .step-btn {
+    background: var(--card-front);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0 10px;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .step-btn:disabled { opacity: 0.4; cursor: default; }
+  .max-value { min-width: 28px; text-align: center; font-weight: 600; font-size: 1.05rem; }
   .value.long { font-size: 1.35rem; }
   .quiz-card .value.long { font-size: clamp(1.6rem, 6vw, 2.2rem); }
   .grid {
@@ -131,7 +149,7 @@
   #gridView { width: 100%; max-width: 860px; }
   #gridView.hidden { display: none; }
   .quiz-card {
-    width: min(320px, 80vw, max(130px, calc((100vh - 600px) * 0.75)));
+    width: min(320px, 80vw, max(130px, calc((100vh - 650px) * 0.75)));
     aspect-ratio: 3 / 4;
   }
   .quiz-card .expr { font-size: clamp(2.6rem, 11vw, 3.4rem); }
@@ -189,30 +207,33 @@
   }
   .key.accent { background: var(--card-back); border-color: var(--accent); }
   .keypad.locked .key { opacity: 0.5; pointer-events: none; }
-  @media (max-height: 750px) {
+  @media (max-height: 780px) {
     .tabs { margin-bottom: 12px; }
     .base-row { margin-bottom: 8px; }
     .base-btn { min-height: 36px; min-width: 40px; }
-    .quiz-card { width: min(320px, 80vw, max(120px, calc((100vh - 480px) * 0.75))); }
+    .max-row { margin-bottom: 10px; }
+    .quiz-card { width: min(320px, 80vw, max(90px, calc((100vh - 525px) * 0.75))); }
     .quiz-display { margin-top: 10px; min-height: 44px; }
     .keypad { margin-top: 10px; gap: 6px; }
-    .key { min-height: 42px; }
+    .key { min-height: 40px; }
     .quiz-meta { margin-top: 8px; }
     .quiz-controls { margin-top: 8px; }
     .quiz-controls button { min-height: 38px; padding: 6px 14px; }
   }
   @media (max-height: 600px) {
-    body { padding-top: 14px; padding-bottom: 10px; }
-    .tabs { margin-bottom: 8px; }
-    .base-row { margin-bottom: 6px; }
+    body { padding-top: 10px; padding-bottom: 8px; }
+    .tabs { margin-bottom: 6px; }
+    .base-row { margin-bottom: 4px; }
     .base-btn { min-height: 34px; min-width: 38px; }
-    .quiz-card { width: min(320px, 80vw, max(100px, calc((100vh - 440px) * 0.75))); }
-    .quiz-display { margin-top: 10px; min-height: 40px; font-size: 1.2rem; }
-    .keypad { margin-top: 10px; gap: 3px; }
-    .key { min-height: 40px; font-size: 1.05rem; }
-    .quiz-meta { margin-top: 8px; font-size: 0.8rem; }
-    .quiz-controls { margin-top: 7px; }
-    .quiz-controls button { min-height: 36px; padding: 6px 12px; font-size: 0.85rem; }
+    .max-row { margin-bottom: 6px; }
+    .step-btn { min-height: 32px; min-width: 32px; }
+    .quiz-card { width: min(320px, 80vw, max(80px, calc((100vh - 490px) * 0.75))); }
+    .quiz-display { margin-top: 8px; min-height: 36px; font-size: 1.2rem; }
+    .keypad { margin-top: 8px; gap: 3px; }
+    .key { min-height: 36px; font-size: 1.05rem; }
+    .quiz-meta { margin-top: 6px; font-size: 0.75rem; }
+    .quiz-controls { margin-top: 6px; }
+    .quiz-controls button { min-height: 34px; padding: 5px 12px; font-size: 0.85rem; }
   }
   .face { transition: border-color 0.3s, box-shadow 0.3s; }
   body.quiz-mode .hint { display: none; }
@@ -250,6 +271,12 @@
   </div>
 
   <div id="quizView">
+    <div class="max-row">
+      <span class="base-label">Макс. степень:</span>
+      <button class="step-btn" id="maxDown" aria-label="Уменьшить">−</button>
+      <span class="max-value" id="maxValue">10</span>
+      <button class="step-btn" id="maxUp" aria-label="Увеличить">+</button>
+    </div>
     <div class="card quiz-card" id="quizCard">
       <div class="card-inner">
         <div class="face face-front">
@@ -351,15 +378,37 @@
   var quizCorrect = 0;
   var quizWrong = 0;
   var quizTimer = null;
+  var maxN = 10;
   var quizDisplay = document.getElementById('quizDisplay');
   var keypad = document.getElementById('keypad');
   var quizTyped = '';
+  var maxValueEl = document.getElementById('maxValue');
+  var maxDownBtn = document.getElementById('maxDown');
+  var maxUpBtn = document.getElementById('maxUp');
+
+  function setMaxN(v) {
+    if (v < 2 || v > 10 || v === maxN) return;
+    maxN = v;
+    maxValueEl.textContent = maxN;
+    maxDownBtn.disabled = maxN <= 2;
+    maxUpBtn.disabled = maxN >= 10;
+    if (quizView.classList.contains('active')) {
+      if (quizCurrent > maxN) {
+        nextCard();
+      } else {
+        // текущая карточка валидна, но генератор больше не должен её исключать
+      }
+    }
+  }
+
+  maxDownBtn.addEventListener('click', function() { setMaxN(maxN - 1); });
+  maxUpBtn.addEventListener('click', function() { setMaxN(maxN + 1); });
 
   function randomN(notEqual) {
     var n;
     do {
-      n = 1 + Math.floor(Math.random() * 10);
-    } while (n === notEqual);
+      n = 1 + Math.floor(Math.random() * maxN);
+    } while (n === notEqual && maxN > 1);
     return n;
   }
 
