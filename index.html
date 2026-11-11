@@ -325,6 +325,8 @@
       var v = parseInt(b.getAttribute('data-base'), 10);
       if (v === curBase) return;
       curBase = v;
+      quizCorrect = 0;
+      quizWrong = 0;
       baseBtns.forEach(function(x) { x.classList.toggle('active', x === b); });
       if (quizView.classList.contains('active')) {
         nextCard();
