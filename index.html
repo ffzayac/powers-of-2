@@ -28,7 +28,7 @@
   }
   h1 { font-size: clamp(1.2rem, 4vw, 1.5rem); font-weight: 600; margin-bottom: 6px; }
   .hint { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 28px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
   .tab {
     background: transparent;
     color: var(--muted);
@@ -48,6 +48,11 @@
     color: var(--text);
     border-color: var(--accent);
   }
+  .base-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 28px; }
+  .base-label { color: var(--muted); font-size: 0.9rem; }
+  .base-btn { min-height: 48px; min-width: 48px; padding: 8px 0; }
+  .value.long { font-size: 1.35rem; }
+  .quiz-card .value.long { font-size: clamp(1.6rem, 6vw, 2.2rem); }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -126,7 +131,7 @@
   #gridView { width: 100%; max-width: 860px; }
   #gridView.hidden { display: none; }
   .quiz-card {
-    width: min(320px, 80vw, max(150px, calc((100vh - 560px) * 0.75)));
+    width: min(320px, 80vw, max(130px, calc((100vh - 600px) * 0.75)));
     aspect-ratio: 3 / 4;
   }
   .quiz-card .expr { font-size: clamp(2.6rem, 11vw, 3.4rem); }
@@ -186,22 +191,27 @@
   .keypad.locked .key { opacity: 0.5; pointer-events: none; }
   @media (max-height: 750px) {
     .tabs { margin-bottom: 12px; }
-    .quiz-display { margin-top: 12px; min-height: 44px; }
-    .keypad { margin-top: 12px; gap: 6px; }
-    .key { min-height: 44px; }
-    .quiz-meta { margin-top: 10px; }
-    .quiz-controls { margin-top: 10px; }
-    .quiz-controls button { min-height: 40px; padding: 8px 14px; }
+    .base-row { margin-bottom: 8px; }
+    .base-btn { min-height: 36px; min-width: 40px; }
+    .quiz-card { width: min(320px, 80vw, max(120px, calc((100vh - 480px) * 0.75))); }
+    .quiz-display { margin-top: 10px; min-height: 44px; }
+    .keypad { margin-top: 10px; gap: 6px; }
+    .key { min-height: 42px; }
+    .quiz-meta { margin-top: 8px; }
+    .quiz-controls { margin-top: 8px; }
+    .quiz-controls button { min-height: 38px; padding: 6px 14px; }
   }
   @media (max-height: 600px) {
-    body { padding-top: 14px; padding-bottom: 12px; }
+    body { padding-top: 14px; padding-bottom: 10px; }
     .tabs { margin-bottom: 8px; }
-    .quiz-card { width: min(320px, 80vw, max(120px, calc((100vh - 480px) * 0.75))); }
+    .base-row { margin-bottom: 6px; }
+    .base-btn { min-height: 34px; min-width: 38px; }
+    .quiz-card { width: min(320px, 80vw, max(100px, calc((100vh - 440px) * 0.75))); }
     .quiz-display { margin-top: 10px; min-height: 40px; font-size: 1.2rem; }
-    .keypad { margin-top: 10px; gap: 4px; }
+    .keypad { margin-top: 10px; gap: 3px; }
     .key { min-height: 40px; font-size: 1.05rem; }
     .quiz-meta { margin-top: 8px; font-size: 0.8rem; }
-    .quiz-controls { margin-top: 8px; }
+    .quiz-controls { margin-top: 7px; }
     .quiz-controls button { min-height: 36px; padding: 6px 12px; font-size: 0.85rem; }
   }
   .face { transition: border-color 0.3s, box-shadow 0.3s; }
@@ -221,6 +231,13 @@
   <div class="tabs">
     <button class="tab active" id="tabGrid">Все карточки</button>
     <button class="tab" id="tabQuiz">Квиз</button>
+  </div>
+  <div class="base-row" id="baseRow">
+    <span class="base-label">Основание:</span>
+    <button class="tab base-btn active" data-base="2">2</button>
+    <button class="tab base-btn" data-base="3">3</button>
+    <button class="tab base-btn" data-base="4">4</button>
+    <button class="tab base-btn" data-base="5">5</button>
   </div>
   <p class="hint" id="hint">Нажми на карточку, чтобы перевернуть</p>
 
@@ -269,30 +286,53 @@
   var quizMeta = document.getElementById('quizMeta');
 
   /* ---- Режим «Все карточки» ---- */
+  var curBase = 2;
+  var baseBtns = Array.prototype.slice.call(document.querySelectorAll('.base-btn'));
   var cards = [];
-  for (var n = 1; n <= 10; n++) {
-    var card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML =
-      '<div class="card-inner">' +
-        '<div class="face face-front">' +
-          '<span class="label">степень</span>' +
-          '<span class="expr">2<sup>' + n + '</sup></span>' +
-        '</div>' +
-        '<div class="face face-back">' +
-          '<span class="label">значение</span>' +
-          '<span class="value">' + Math.pow(2, n) + '</span>' +
-        '</div>' +
-      '</div>';
-    card.addEventListener('click', (function(c) {
-      return function() {
-        c.classList.toggle('flipped');
-        if (navigator.vibrate) navigator.vibrate(10);
-      };
-    })(card));
-    grid.appendChild(card);
-    cards.push(card);
+
+  function buildGrid() {
+    grid.innerHTML = '';
+    cards = [];
+    for (var n = 1; n <= 10; n++) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      var v = Math.pow(curBase, n);
+      card.innerHTML =
+        '<div class="card-inner">' +
+          '<div class="face face-front">' +
+            '<span class="label">степень</span>' +
+            '<span class="expr">' + curBase + '<sup>' + n + '</sup></span>' +
+          '</div>' +
+          '<div class="face face-back">' +
+            '<span class="label">значение</span>' +
+            '<span class="value' + (String(v).length >= 6 ? ' long' : '') + '">' + v + '</span>' +
+          '</div>' +
+        '</div>';
+      card.addEventListener('click', (function(c) {
+        return function() {
+          c.classList.toggle('flipped');
+          if (navigator.vibrate) navigator.vibrate(10);
+        };
+      })(card));
+      grid.appendChild(card);
+      cards.push(card);
+    }
   }
+  buildGrid();
+
+  baseBtns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      var v = parseInt(b.getAttribute('data-base'), 10);
+      if (v === curBase) return;
+      curBase = v;
+      baseBtns.forEach(function(x) { x.classList.toggle('active', x === b); });
+      if (quizView.classList.contains('active')) {
+        nextCard();
+      } else {
+        buildGrid();
+      }
+    });
+  });
 
   document.getElementById('flipAll').addEventListener('click', function() {
     cards.forEach(function(c) { c.classList.add('flipped'); });
@@ -326,8 +366,10 @@
   }
 
   function applyCard(n) {
-    quizExpr.innerHTML = '2<sup>' + n + '</sup>';
-    quizValue.textContent = Math.pow(2, n);
+    var v = Math.pow(curBase, n);
+    quizExpr.innerHTML = curBase + '<sup>' + n + '</sup>';
+    quizValue.textContent = v;
+    quizValue.classList.toggle('long', String(v).length >= 6);
   }
 
   function renderDisplay() {
@@ -341,7 +383,7 @@
   }
 
   function pressDigit(d) {
-    if (quizStage !== 'front' || quizTyped.length >= 4) return;
+    if (quizStage !== 'front' || quizTyped.length >= 7) return;
     quizTyped += d;
     renderDisplay();
   }
@@ -371,7 +413,7 @@
 
   function answer() {
     if (quizStage !== 'front' || !/^\d+$/.test(quizTyped)) return;
-    var ok = parseInt(quizTyped, 10) === Math.pow(2, quizCurrent);
+    var ok = parseInt(quizTyped, 10) === Math.pow(curBase, quizCurrent);
     if (ok) { quizCorrect++; } else { quizWrong++; }
     if (navigator.vibrate) navigator.vibrate(ok ? 10 : [10, 50, 10]);
     quizStage = 'back';
