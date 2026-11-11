@@ -139,6 +139,33 @@
     font-size: 0.9rem;
   }
   .quiz-controls { margin-top: 16px; display: flex; gap: 12px; }
+  .quiz-input-row { margin-top: 20px; display: flex; gap: 8px; }
+  #quizInput {
+    background: var(--card-front);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-family: inherit;
+    padding: 10px 14px;
+    width: 160px;
+    min-height: 48px;
+    text-align: center;
+    outline: none;
+    touch-action: manipulation;
+    transition: border-color 0.2s;
+  }
+  #quizInput:focus { border-color: var(--accent); }
+  #quizInput:disabled { opacity: 0.5; }
+  .face { transition: border-color 0.3s, box-shadow 0.3s; }
+  .quiz-card.correct .face {
+    border-color: #4caf50;
+    box-shadow: 0 0 18px rgba(76, 175, 80, 0.35);
+  }
+  .quiz-card.wrong .face {
+    border-color: #e53935;
+    box-shadow: 0 0 18px rgba(229, 57, 53, 0.35);
+  }
 </style>
 </head>
 <body>
@@ -170,8 +197,13 @@
         </div>
       </div>
     </div>
-    <div class="quiz-meta" id="quizMeta">Показано карточек: 0</div>
+    <div class="quiz-input-row">
+      <input id="quizInput" type="text" inputmode="numeric" autocomplete="off" placeholder="Введи значение">
+      <button id="quizAnswer">Ответить</button>
+    </div>
+    <div class="quiz-meta" id="quizMeta">Верно: 0 · Неверно: 0 · Точность: —</div>
     <div class="quiz-controls">
+      <button id="quizResetStats">Сброс статистики</button>
       <button id="quizExit">Выход</button>
     </div>
   </div>
@@ -224,9 +256,12 @@
   });
 
   /* ---- Режим «Квиз» ---- */
-  var quizStage = 'front';   // 'front' — ждём переворот, 'back' — ждём следующую карточку
+  var quizStage = 'front';   // 'front' — ждём ответ, 'back' — показываем результат
   var quizCurrent = 0;
-  var quizShown = 0;
+  var quizCorrect = 0;
+  var quizWrong = 0;
+  var quizTimer = null;
+  var quizInput = document.getElementById('quizInput');
 
   function randomN(notEqual) {
     var n;
@@ -234,6 +269,12 @@
       n = 1 + Math.floor(Math.random() * 10);
     } while (n === notEqual);
     return n;
+  }
+
+  function updateMeta() {
+    var total = quizCorrect + quizWrong;
+    var acc = total ? Math.round(quizCorrect / total * 100) + '%' : '—';
+    quizMeta.textContent = 'Верно: ' + quizCorrect + ' · Неверно: ' + quizWrong + ' · Точность: ' + acc;
   }
 
   function applyCard(n) {
@@ -244,6 +285,7 @@
   function showQuizCard(n) {
     quizCurrent = n;
     quizStage = 'front';
+    quizCard.classList.remove('correct', 'wrong');
     if (quizCard.classList.contains('flipped')) {
       // прячем старый ответ поворотом и меняем содержимое, когда оборот уже «на ребре»
       quizCard.classList.remove('flipped');
@@ -251,21 +293,49 @@
     } else {
       applyCard(n);
     }
-    quizMeta.textContent = 'Показано карточек: ' + quizShown;
+    quizInput.disabled = false;
+    quizInput.value = '';
+    quizInput.focus();
+    updateMeta();
+  }
+
+  function answer() {
+    if (quizStage !== 'front') return;
+    var raw = quizInput.value.trim();
+    if (!/^\d+$/.test(raw)) return;
+    var ok = parseInt(raw, 10) === Math.pow(2, quizCurrent);
+    if (ok) { quizCorrect++; } else { quizWrong++; }
+    if (navigator.vibrate) navigator.vibrate(ok ? 10 : [10, 50, 10]);
+    quizStage = 'back';
+    quizInput.disabled = true;
+    quizCard.classList.add(ok ? 'correct' : 'wrong');
+    quizCard.classList.add('flipped');
+    updateMeta();
+    quizTimer = setTimeout(nextCard, 1200);
+  }
+
+  function nextCard() {
+    if (quizTimer) { clearTimeout(quizTimer); quizTimer = null; }
+    showQuizCard(randomN(quizCurrent));
   }
 
   quizCard.addEventListener('click', function() {
-    if (navigator.vibrate) navigator.vibrate(10);
-    if (quizStage === 'front') {
-      quizStage = 'back';
-      quizCard.classList.add('flipped');
-    } else {
-      quizShown++;
-      showQuizCard(randomN(quizCurrent));
-    }
+    if (quizStage === 'back') nextCard();
   });
-
+  document.getElementById('quizAnswer').addEventListener('click', answer);
+  quizInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') answer();
+  });
+  quizInput.addEventListener('input', function() {
+    quizInput.value = quizInput.value.replace(/\D/g, '').slice(0, 4);
+  });
+  document.getElementById('quizResetStats').addEventListener('click', function() {
+    quizCorrect = 0;
+    quizWrong = 0;
+    updateMeta();
+  });
   document.getElementById('quizExit').addEventListener('click', function() {
+    if (quizTimer) { clearTimeout(quizTimer); quizTimer = null; }
     setMode('grid');
   });
 
@@ -277,8 +347,9 @@
     gridView.classList.toggle('hidden', isQuiz);
     quizView.classList.toggle('active', isQuiz);
     if (isQuiz) {
-      hint.textContent = 'Нажми на карточку, чтобы увидеть ответ, ещё раз — следующая';
-      quizShown = 0;
+      hint.textContent = 'Введи значение степени и нажми «Ответить»';
+      quizCorrect = 0;
+      quizWrong = 0;
       showQuizCard(randomN(0));
     } else {
       hint.textContent = 'Нажми на карточку, чтобы перевернуть';
